@@ -8,5 +8,5 @@ class ArtikelModel extends Model
 {
     protected $table = 'artikel';
     protected $primaryKey = 'id';
-    protected $allowedFields = ['judul', 'isi', 'slug', 'status', 'gambar'];
+    protected $allowedFields = ['judul', 'isi', 'status', 'id_kategori', 'slug'];
 }

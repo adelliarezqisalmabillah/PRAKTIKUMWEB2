@@ -9,14 +9,13 @@ use CodeIgniter\Router\RouteCollection;
 // ======================
 // ROUTE UTAMA
 // ======================
-// Mengarahkan halaman utama ke Home Controller
+// Mengarahkan halaman utama root ke Home Controller
 $routes->get('/', 'Home::index');
 
 
 // ======================
 // ROUTE HALAMAN STATIS
 // ======================
-// Pastikan Controller "Page" memiliki method about, contact, dan faqs
 $routes->get('about', 'Page::about');
 $routes->get('contact', 'Page::contact');
 $routes->get('faqs', 'Page::faqs');
@@ -25,7 +24,6 @@ $routes->get('faqs', 'Page::faqs');
 // ======================
 // ROUTE LOGIN & LOGOUT (USER)
 // ======================
-// Memisahkan GET untuk tampil form dan POST untuk proses login agar lebih aman
 $routes->get('user/login', 'User::login');
 $routes->post('user/login', 'User::login');
 $routes->get('user/logout', 'User::logout');
@@ -35,7 +33,7 @@ $routes->get('user/logout', 'User::logout');
 // ROUTE ADMIN (DENGAN FILTER AUTH)
 // ======================
 /** * Grup ini diproteksi oleh Filter 'auth'. 
- * Jika belum login, user akan ditendang kembali ke halaman login.
+ * Jika belum login, user akan diarahkan kembali ke halaman login.
  */
 $routes->group('admin', ['filter' => 'auth'], function($routes) {
 
@@ -57,10 +55,27 @@ $routes->group('admin', ['filter' => 'auth'], function($routes) {
 
 
 // ======================
-// ROUTE ARTIKEL (PUBLIK)
+// ROUTE AJAX (PRAKTIKUM 9)
 // ======================
-// Daftar artikel untuk pengunjung umum
-$routes->get('artikel', 'Artikel::index');
+// Route khusus untuk memproses data secara asynchronous (AJAX)
+$routes->get('ajax', 'AjaxController::index');
+$routes->get('ajax/getData', 'AjaxController::getData');
+// Menggunakan GET untuk menghapus jika di view/script lama menggunakan tautan <a> biasa, 
+// atau biarkan kombinasi GET/DELETE agar aman dari segala jenis request AJAX.
+$routes->get('ajax/delete/(:num)', 'AjaxController::delete/$1');
+$routes->delete('ajax/delete/(:num)', 'AjaxController::delete/$1');
 
-// Detail artikel berdasarkan slug (misal: artikel/belajar-codeigniter-4)
+
+// ======================
+// ROUTE RESTful API (PRAKTIKUM 10 & 11)
+// ======================
+// Otomatis mendaftarkan rute CRUD (GET, POST, PUT, DELETE) untuk Post Controller API VueJS
+$routes->resource('post');
+
+
+// ======================
+// ROUTE ARTIKEL (PUBLIK) - Ditaruh Paling Bawah
+// ======================
+// Catatan: Rute berbasis (:segment) harus ditaruh di paling bawah agar tidak memblokir rute url spesifik seperti 'admin' atau 'ajax'
+$routes->get('artikel', 'Artikel::index');
 $routes->get('artikel/(:segment)', 'Artikel::view/$1');

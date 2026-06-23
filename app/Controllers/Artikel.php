@@ -3,154 +3,85 @@
 namespace App\Controllers;
 
 use App\Models\ArtikelModel;
-use CodeIgniter\Exceptions\PageNotFoundException;
+use App\Models\KategoriModel;
 
 class Artikel extends BaseController
 {
-    protected $artikelModel;
-
-    public function __construct()
-    {
-        $this->artikelModel = new ArtikelModel();
-    }
-
-    // ==========================================
-    // BAGIAN USER (HALAMAN DEPAN)
-    // ==========================================
-
+    // Method untuk halaman publik (pengunjung biasa)
     public function index()
     {
+        $model = new ArtikelModel();
         $data = [
             'title'   => 'Daftar Artikel',
-            'artikel' => $this->artikelModel->paginate(6, 'artikel'), 
-            'pager'   => $this->artikelModel->pager,
+            'artikel' => $model->findAll()
         ];
-
         return view('artikel/index', $data);
     }
-
-    public function view($slug)
-    {
-        $artikel = $this->artikelModel->where('slug', $slug)->first();
-
-        if (!$artikel) {
-            throw PageNotFoundException::forPageNotFound("Artikel tidak ditemukan.");
-        }
-
-        $data = [
-            'title'   => $artikel['judul'],
-            'artikel' => $artikel
-        ];
-
-        return view('artikel/view', $data);
-    }
-
-    // ==========================================
-    // BAGIAN ADMIN (CRUD)
-    // ==========================================
-
+    
+    // Method untuk halaman manajemen data (Admin) berteknologi AJAX
     public function admin_index()
     {
-        $data = [
-            'title'   => 'Halaman Admin - Artikel',
-            'artikel' => $this->artikelModel->paginate(10, 'artikel'),
-            'pager'   => $this->artikelModel->pager
+        $title = 'Daftar Artikel (Admin)';
+        $model = new ArtikelModel();
+        
+        // Mengambil query pencarian, filter kategori, sorting, dan halaman aktif
+        $q = $this->request->getVar('q') ?? '';
+        $kategori_id = $this->request->getVar('kategori_id') ?? '';
+        $page = $this->request->getVar('page') ?? 1;
+        
+        // Fitur Tambahan: Mengambil parameter sorting dari request AJAX/Form
+        $sortBy = $this->request->getVar('sort_by') ?? 'artikel.id';
+        $sortOrder = $this->request->getVar('sort_order') ?? 'DESC';
+
+        // Mengatur Builder Query untuk join tabel artikel dengan kategori
+        $builder = $model->table('artikel')
+                         ->select('artikel.*, kategori.nama_kategori')
+                         ->join('kategori', 'kategori.id_kategori = artikel.id_kategori');
+
+        // Filter Pencarian Judul
+        if ($q != '') {
+            $builder->like('artikel.judul', $q);
+        }
+
+        // Filter Berdasarkan Kategori
+        if ($kategori_id != '') {
+            $builder->where('artikel.id_kategori', $kategori_id);
+        }
+        
+        // Menerapkan fitur pengurutan (Sorting) pada Query Builder
+        $builder->orderBy($sortBy, $sortOrder);
+
+        // Eksekusi pagination (10 data per halaman)
+        $artikel = $builder->paginate(10, 'default', $page);
+        $pager = $model->pager;
+
+        // Menyiapkan struktur data Pager yang aman untuk dikonversi ke JSON (Mencegah Error Maksimal Stack)
+        $pagerData = [
+            'currentPage' => $pager->getCurrentPage('default'),
+            'pageCount'   => $pager->getPageCount('default'),
+            // Memetakan links pagination bawaan CI4 agar mudah di-render oleh JavaScript
+            'links'       => $pager->links('default', 'default_full') 
         ];
 
-        return view('admin/artikel_index', $data);
-    }
+        // Menyiapkan data array untuk dikirim
+        $data = [
+            'title'       => $title,
+            'q'           => $q,
+            'kategori_id' => $kategori_id,
+            'sort_by'     => $sortBy,
+            'sort_order'  => $sortOrder,
+            'artikel'     => $artikel,
+            'pager'       => $pagerData 
+        ];
 
-    /**
-     * Tambah Artikel Baru dengan Upload Gambar
-     */
-    public function add()
-    {
-        if ($this->request->is('post')) {
-            $fileGambar = $this->request->getFile('gambar');
-            $namaGambar = null;
-
-            // Jika ada file yang diunggah
-            if ($fileGambar && $fileGambar->isValid() && !$fileGambar->hasMoved()) {
-                $namaGambar = $fileGambar->getRandomName();
-                $fileGambar->move('uploads', $namaGambar);
-            }
-
-            $this->artikelModel->save([
-                'judul'  => $this->request->getPost('judul'),
-                'isi'    => $this->request->getPost('isi'),
-                'status' => $this->request->getPost('status') ?? 1,
-                'gambar' => $namaGambar,
-                'slug'   => url_title($this->request->getPost('judul'), '-', true)
-            ]);
-
-            session()->setFlashdata('pesan', 'Artikel berhasil diterbitkan!');
-            return redirect()->to('/admin/artikel');
+        // Cek jika request datang dari AJAX
+        if ($this->request->isAJAX()) {
+            return $this->response->setJSON($data);
+        } else {
+            // Jika diakses manual lewat browser, muat halaman beserta daftar kategorinya
+            $kategoriModel = new KategoriModel();
+            $data['kategori'] = $kategoriModel->findAll();
+            return view('artikel/admin_index', $data);
         }
-
-        return view('admin/artikel_add', ['title' => 'Tambah Artikel']);
-    }
-
-    /**
-     * Edit Artikel dengan Update Gambar
-     */
-    public function edit($id)
-    {
-        $artikelLama = $this->artikelModel->find($id);
-
-        if ($this->request->is('post')) {
-            $fileGambar = $this->request->getFile('gambar');
-            $namaGambar = $artikelLama['gambar']; // Default pakai nama lama
-
-            // Jika user mengunggah gambar baru
-            if ($fileGambar && $fileGambar->isValid() && !$fileGambar->hasMoved()) {
-                $namaGambar = $fileGambar->getRandomName();
-                $fileGambar->move('uploads', $namaGambar);
-
-                // Hapus gambar lama dari folder jika ada
-                if ($artikelLama['gambar'] && file_exists('uploads/' . $artikelLama['gambar'])) {
-                    unlink('uploads/' . $artikelLama['gambar']);
-                }
-            }
-
-            $this->artikelModel->update($id, [
-                'judul'  => $this->request->getPost('judul'),
-                'isi'    => $this->request->getPost('isi'),
-                'status' => $this->request->getPost('status'),
-                'gambar' => $namaGambar,
-                'slug'   => url_title($this->request->getPost('judul'), '-', true)
-            ]);
-
-            session()->setFlashdata('pesan', 'Artikel berhasil diperbarui!');
-            return redirect()->to('/admin/artikel');
-        }
-
-        if (!$artikelLama) {
-            throw PageNotFoundException::forPageNotFound("Data tidak ditemukan.");
-        }
-
-        return view('admin/artikel_edit', [
-            'title'   => 'Edit Artikel',
-            'artikel' => $artikelLama
-        ]);
-    }
-
-    /**
-     * Hapus Artikel dan File Gambarnya
-     */
-    public function delete($id)
-    {
-        $artikel = $this->artikelModel->find($id);
-
-        if ($artikel) {
-            // Hapus file gambar dari folder uploads
-            if ($artikel['gambar'] && file_exists('uploads/' . $artikel['gambar'])) {
-                unlink('uploads/' . $artikel['gambar']);
-            }
-            
-            $this->artikelModel->delete($id);
-            session()->setFlashdata('pesan', 'Artikel telah dihapus.');
-        }
-
-        return redirect()->to('/admin/artikel');
     }
 }

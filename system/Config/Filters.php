@@ -2,15 +2,6 @@
 
 declare(strict_types=1);
 
-/**
- * This file is part of CodeIgniter 4 framework.
- *
- * (c) CodeIgniter Foundation <admin@codeigniter.com>
- *
- * For the full copyright and license information, please view
- * the LICENSE file that was distributed with this source code.
- */
-
 namespace CodeIgniter\Config;
 
 use CodeIgniter\Filters\Cors;
@@ -79,12 +70,13 @@ class Filters extends BaseConfig
      * applied before and after every request.
      *
      * @var array{
-     *    before: array<string, array{except: list<string>|string}>|list<string>,
-     *    after: array<string, array{except: list<string>|string}>|list<string>
+     * before: array<string, array{except: list<string>|string}>|list<string>,
+     * after: array<string, array{except: list<string>|string}>|list<string>
      * }
      */
     public array $globals = [
         'before' => [
+            'cors', // <--- CORS BERHASIL DIAKTIFKAN DI SINI SECARA GLOBAL
             // 'honeypot',
             // 'csrf',
             // 'invalidchars',
